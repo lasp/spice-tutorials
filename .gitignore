@@ -1,0 +1,23 @@
+# Quarto build output
+/_site/
+/.quarto/
+slides/*.html
+slides/*_files/
+*_files/
+
+# SPICE kernels are downloaded, not committed
+kernels/*
+!kernels/*.tm
+!kernels/README.md
+
+# Python / Jupyter
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

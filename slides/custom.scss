@@ -1,0 +1,13 @@
+/*-- scss:defaults --*/
+$presentation-font-size-root: 34px;
+$link-color: #1f5fa8;
+$presentation-heading-color: #14324f;
+
+/*-- scss:rules --*/
+.reveal .slide-subtitle { color: #4a5a6a; }
+.reveal .small { font-size: 0.7em; }
+.reveal .muted { color: #6b7785; }
+.reveal .callout { border-left: 6px solid #1f5fa8; background: #eef4fb; padding: 0.4em 0.8em; margin-top: 0.6em; }
+.reveal table { font-size: 0.62em; }
+.reveal pre code { font-size: 0.95em; line-height: 1.3; max-height: none; }
+.reveal .big-number { font-size: 2.4em; font-weight: 700; color: #1f5fa8; line-height: 1.1; }

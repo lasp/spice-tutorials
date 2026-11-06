@@ -1,0 +1,392 @@
+---
+title: "Session 2: Time"
+subtitle: "Why a spacecraft needs an SCLK kernel"
+author: "SPICE Book Club · LASP"
+format:
+  revealjs:
+    theme: [default, custom.scss]
+    slide-number: true
+    preview-links: auto
+    embed-resources: true
+    footer: "SPICE Book Club · Session 2: Time"
+jupyter: python3
+execute:
+  echo: false
+  warning: false
+---
+
+```{python}
+#| label: setup
+import numpy as np
+import matplotlib.pyplot as plt
+import spiceypy as sp
+
+sp.kclear()
+sp.furnsh("../kernels/naif0012.tls")   # leapseconds kernel (LSK)
+
+plt.rcParams.update({
+    "figure.dpi": 150, "font.size": 11, "axes.spines.top": False,
+    "axes.spines.right": False, "axes.titlesize": 12,
+})
+BLUE, ORANGE, GREY = "#1f5fa8", "#d9822b", "#8a96a3"
+```
+
+## A packet arrives from Mars {.smaller}
+
+The MAVEN header says the data were taken at
+
+<p class="big-number">SCLK 3/0812345678.32768</p>
+
+**When was that, in UTC? And where was MAVEN?**
+
+. . .
+
+To answer, SPICE needs two pieces of knowledge that live in kernels:
+
+- how Earth's civil time relates to uniform physical time → **LSK**
+- how *this spacecraft's* clock relates to physical time → **SCLK**
+
+Today: where those two files come from, and why they look the way they do.
+
+::: notes
+Open with the concrete question. Everyone in data systems has seen a raw clock value in a packet header; few have thought about what it takes to turn it into a UTC string. The rest of the talk builds up the two kernels that answer it.
+:::
+
+## Two ways to count time
+
+:::: {.columns}
+::: {.column width="50%"}
+**Solar time (UT1)**
+
+- Noon = Sun over the prime meridian
+- Follows Earth's rotation, which is irregular and slowing (~ms per day)
+- What humans live by
+:::
+::: {.column width="50%"}
+**Atomic time (TAI)**
+
+- Weighted average of hundreds of atomic clocks worldwide
+- Every second is an SI second (cesium-133)
+- Perfectly uniform, ignores the Sun
+:::
+::::
+
+::: {.callout}
+**UTC** ticks atomic seconds but inserts *leap seconds* to stay within 0.9 s of UT1.
+:::
+
+::: notes
+Lifted from the LASP Time presentation (Bershenyi/Moffatt, 2026), slides 9-12. The key point: UTC is a compromise — atomic tick rate, solar alignment — and the compromise is paid for with discontinuities.
+:::
+
+## The cost of the compromise: leap seconds
+
+```{python}
+#| fig-width: 9
+#| fig-height: 4.2
+years = np.arange(1972.0, 2027.0, 0.05)
+tai_utc = []
+for y in years:
+    yr = int(y); frac = y - yr
+    et = sp.str2et(f"{yr}-01-01T00:00:00") + frac * 365.25 * 86400
+    tai_utc.append(sp.deltet(et, "ET") - 32.184)   # ET-UTC minus (TT-TAI)
+
+fig, ax = plt.subplots(figsize=(9, 4.2))
+ax.step(years, np.round(tai_utc), where="post", color=BLUE, lw=2)
+ax.set_xlabel("Year"); ax.set_ylabel("TAI − UTC (s)")
+ax.set_title("27 leap seconds since 1972, read straight from the LSK")
+ax.annotate("Last one: 2016-12-31 23:59:60", xy=(2017, 37), xytext=(1996, 35.5),
+            arrowprops=dict(arrowstyle="->", color=GREY), color=GREY)
+ax.grid(alpha=0.25)
+plt.tight_layout(); plt.show()
+```
+
+::: {.small}
+A leap-second day has 86 401 seconds. In 2022 the CGPM decided to let UT1 − UTC grow beyond 1 s by 2035, effectively ending leap seconds; the LSK still matters for every date before then.
+:::
+
+::: notes
+The data in this plot are the DELTET/DELTA_AT table in the LSK. Ask: what does your code do with 23:59:60? Python's datetime cannot represent it. SPICE can: str2et accepts it.
+:::
+
+## Time for physics: TT, TDB and ET
+
+```{mermaid}
+%%| fig-width: 10
+flowchart LR
+  UTC["UTC<br/>civil time"] -->|"+ leap seconds<br/>(LSK table)"| TAI["TAI<br/>atomic"]
+  TAI -->|"+ 32.184 s<br/>(fixed)"| TT["TT / TDT<br/>Earth-surface<br/>proper time"]
+  TT -->|"+ periodic term<br/>≤ 1.7 ms"| TDB["TDB = ET<br/>solar-system<br/>barycentric"]
+```
+
+- Equations of motion need a uniform time at the solar-system barycenter: **TDB**.
+- **ET** in SPICE = TDB seconds past J2000 (2000-01-01 12:00:00 TDB).
+- UTC is only an *input/output format*; SPICE computes in ET.
+- Everything on this slide is in the LSK — four numbers plus the leap-second table.
+
+::: notes
+TDB differs from TT because clocks on Earth tick at different rates as Earth moves in the Sun's gravity well over its eccentric orbit (general relativity). The amplitude is about 1.66 ms with an annual period. DELTET/K, EB and M in the LSK are the coefficients of that periodic term.
+:::
+
+## In SpiceyPy
+
+```{python}
+#| echo: true
+et = sp.str2et("2016-12-31T23:59:60")          # UTC string -> ET (TDB s past J2000)
+print(f"ET            = {et:,.3f} s")
+print(f"ET - UTC      = {sp.deltet(et, 'ET'):.6f} s")
+print(f"one second on = {sp.et2utc(et + 1, 'ISOC', 3)}")
+print(f"as DOY        = {sp.timout(et, 'YYYY-DOY // HR:MN:SC.### ::UTC')}")
+```
+
+::: {.small .muted}
+Rule of thumb: convert to ET at the edge of your program, do all arithmetic in ET, convert back to UTC only for display.
+:::
+
+::: notes
+Point out that adding 1 second to the leap second rolls over to the new year correctly. Doing the same with UTC strings or Unix time would silently be off by one.
+:::
+
+## How a spacecraft keeps time
+
+```{mermaid}
+%%| fig-width: 10
+flowchart LR
+  OSC["Crystal oscillator<br/>(oven-controlled)"] --> CNT["Counter<br/>seconds : subticks"]
+  CNT --> FSW["Flight software<br/>distributes time"]
+  FSW --> PKT["Every telemetry packet<br/>stamped with SCLK"]
+  FSW --> CMD["Stored commands<br/>execute on SCLK"]
+```
+
+- No GPS in deep space and no atomic clock on most missions.
+- The counter just counts oscillator cycles since some epoch or reset.
+- An on-board "second" is whatever the oscillator says it is.
+
+::: notes
+The SCLK is not a time scale in the physics sense; it is a counter. Everything downstream — packet time tags, CK time tags, command timing — is expressed in it. That is why SCLK kernels are mission-specific and why CKs are indexed by SCLK ticks, not ET (comes back in Session 5).
+:::
+
+## Reading a clock string: MAVEN
+
+:::: {.columns}
+::: {.column width="55%"}
+`3/0812345678.32768`
+
+| Field | Meaning | Modulus |
+|---|---|---|
+| 1 | whole on-board seconds | 4 294 967 296 (2³²) |
+| 2 | subticks of 1/65 536 s | 65 536 |
+
+- `.32768` is **32768 / 65536 = 0.5 s**, not 0.32768 s
+- One *tick* = 1/65 536 s ≈ 15.3 µs
+:::
+::: {.column width="45%"}
+From `MVN_SCLKSCET.00133.tsc`:
+
+```text
+SCLK01_N_FIELDS_202  = ( 2 )
+SCLK01_MODULI_202    = ( 4294967296
+                         65536 )
+SCLK01_OFFSETS_202   = ( 0 0 )
+SCLK01_TIME_SYSTEM_202 = ( 2 )
+```
+
+`202` is MAVEN's clock ID (spacecraft −202). Time system 2 = TDT (TT).
+:::
+::::
+
+::: notes
+The LASP Time deck has the same warning with a 1/256 subtick: "001 may not be 0.001 seconds". The kernel, not the programmer, knows the moduli — which is why SPICE clock strings (scs2e) are safer than hand decoding.
+:::
+
+## Clocks drift
+
+- Oscillator frequency shifts with **temperature**, **aging** and **radiation**.
+- Small fractional errors add up fast:
+
+:::: {.columns}
+::: {.column width="50%"}
+<p class="big-number">≈ 2 ppm</p>
+MAVEN's current rate: 1.0000020 TT s per clock second
+:::
+::: {.column width="50%"}
+<p class="big-number">≈ 0.17 s/day</p>
+how far MAVEN's clock falls behind TT each day
+:::
+::::
+
+::: {.callout}
+So "SCLK + 86 400" is **not** one day later. Convert to ET, add, convert back.
+:::
+
+::: notes
+Numbers from the last coefficient rows of MAVEN SCLK kernel 00133 (Dec 2025): rates around 1.0000019 to 1.0000021. 2.07e-6 × 86400 s ≈ 0.18 s/day. MAVEN never slews its clock; the ground model absorbs the drift.
+:::
+
+## Correlation: measuring the drift
+
+```{mermaid}
+%%| fig-width: 10
+sequenceDiagram
+  participant SC as MAVEN
+  participant DSN as DSN station
+  participant Ops as Ground ops
+  SC->>DSN: frame stamped SCLK = s
+  Note over SC,DSN: one-way light time 4–22 min
+  DSN->>Ops: received at UTC r
+  Ops->>Ops: sent at r − OWLT − station/transponder delays
+  Ops->>Ops: record pair (s, TT)
+```
+
+Thousands of these pairs over weeks give a drift history.
+
+::: notes
+OWLT comes from the spacecraft and Earth ephemerides — so time correlation already depends on SPK data (Session 3). The station and on-board delays are calibrated constants. LASP's MAVEN ops produce the SCLKvSCET file that NAIF's MAKCLK turns into the kernel.
+:::
+
+## The model: piecewise-linear segments
+
+```{python}
+#| fig-width: 9.5
+#| fig-height: 3.9
+rng = np.random.default_rng(7)
+days = np.arange(0, 240.01, 0.25)
+# fractional rate error: 2 ppm offset + 90-day thermal cycle + slow random walk
+rate_err = 2.0e-6 + 0.12e-6*np.sin(2*np.pi*days/90) + np.cumsum(rng.normal(0, 1e-9, days.size))
+offset = np.concatenate([[0], np.cumsum(rate_err[:-1] * 0.25 * 86400)])      # TT - SCLK (s)
+
+obs_d = np.arange(0, 241, 2.0)                                               # correlation every 2 days
+obs = np.interp(obs_d, days, offset) + rng.normal(0, 0.001, obs_d.size)      # 1 ms measurement noise
+
+TOL = 0.020                                                                  # 20 ms requirement
+breaks, i = [0], 0
+while i < obs_d.size - 1:
+    j = i + 1
+    while j + 1 < obs_d.size:
+        k = j + 1
+        line = obs[i] + (obs[k] - obs[i]) * (obs_d[i:k+1] - obs_d[i]) / (obs_d[k] - obs_d[i])
+        if np.max(np.abs(line - obs[i:k+1])) > TOL * 0.5: break
+        j = k
+    breaks.append(j); i = j
+model = np.interp(days, obs_d[breaks], obs[breaks])
+
+fig, (a1, a2) = plt.subplots(2, 1, figsize=(9.5, 3.9), sharex=True, gridspec_kw={"height_ratios": [1.3, 1]})
+nominal = lambda d: 2.0e-6 * d * 86400                                       # remove the mean 2 ppm trend
+a1.plot(days, (offset - nominal(days))*1e3, color=GREY, lw=1, label="true clock offset")
+a1.plot(obs_d, (obs - nominal(obs_d))*1e3, ".", color=BLUE, ms=3, label="correlation points")
+a1.plot(obs_d[breaks], (obs[breaks] - nominal(obs_d[breaks]))*1e3, "-o", color=ORANGE, ms=3.5, lw=1.4,
+        label=f"SCLK model: {len(breaks)-1} segments")
+a1.set_ylabel("offset minus\n2 ppm trend (ms)"); a1.legend(frameon=False, fontsize=9, loc="lower left", ncol=3)
+a2.axhspan(-TOL*1e3, TOL*1e3, color=BLUE, alpha=0.08)
+a2.plot(days, (offset - model)*1e3, color=ORANGE, lw=1.2)
+a2.axhline(0, color=GREY, lw=0.6)
+a2.set_ylabel("model error (ms)"); a2.set_xlabel("Days since start (simulated clock)")
+a2.text(2, TOL*1e3*0.75, "±20 ms requirement", color=BLUE, fontsize=9)
+for b in obs_d[breaks[1:-1]]:
+    a2.axvline(b, color=GREY, lw=0.4, ls=":")
+plt.tight_layout(); plt.show()
+```
+
+::: {.small .muted}
+Simulated clock: 2 ppm mean drift (≈ 41 s over 240 days, removed in the top panel) plus a 90-day thermal cycle. A new segment starts whenever a straight line can no longer stay within tolerance.
+:::
+
+::: notes
+This is exactly the picture in the LASP deck (slides 27-33), but computed. The orange polyline is what goes in the SCLK kernel. Notebook 02 has participants read the real MAVEN table; Session 7 builds one from this kind of simulation.
+:::
+
+## That table *is* the SCLK kernel
+
+Last rows of `SCLK01_COEFFICIENTS_202` in `MVN_SCLKSCET.00133.tsc` (147 rows in total):
+
+```text
+    SCLK (ticks)          TT (s past J2000)       rate (TT s / clock s)
+5.2781429716173E+13     8.0538118401500E+08     1.0000020628093E+00
+5.2854406018253E+13     8.0649471631200E+08     1.0000020810872E+00
+5.3088007976141E+13     8.1005920673000E+08     1.0000020691935E+00
+5.3296981439693E+13     8.1324789532800E+08     1.0000019830000E+00
+```
+
+Each row starts a segment. For a tick count *s* inside it:
+
+<p class="callout" style="font-size:1.1em">TT(<i>s</i>) = TT<sub>0</sub> + rate × (<i>s</i> − <i>s</i><sub>0</sub>) / 65 536</p>
+
+`scs2e` finds the segment, applies the line, and converts TT → TDB (ET).
+
+::: notes
+Rate units are parallel-time seconds per most-significant clock count (one on-board second for MAVEN), per the SCLK Required Reading. Ticks count the finest field, hence the divide by 65536. The last row is the extrapolation used for times after the latest correlation — which is why reprocessing with a newer SCLK can move recent timestamps.
+:::
+
+## Partitions: when the clock resets
+
+- A reset, rollover or "jam" breaks the count → start a new **partition**.
+- Clock strings carry the partition: `3/0812345678.32768`.
+- MAVEN has **3 partitions** (pre-launch and early cruise; 2013-12 to early 2022; current).
+
+```text
+SCLK_PARTITION_START_202 = ( 0.0000000000000E+00
+                             2.8794165854208E+13
+                             4.5804921290752E+13 )
+```
+
+::: notes
+Without a partition number, scs2e assumes the first partition that contains the count; ambiguous counts are a classic bug after a reset. The LASP deck notes Kepler added two partitions in a single year after safe-mode resets.
+:::
+
+## Three ways LASP missions handle drift
+
+| Strategy | Example missions | Trade-off |
+|---|---|---|
+| Discipline the clock to GPS | MMS, IXPE | Easiest; GPS only near Earth |
+| Adjust the on-board clock | SORCE (formerly AIM) | Small time jumps on board; ground model stays simple |
+| Leave the clock alone; model it on the ground | MAVEN, EMM, Kepler | Clean on-board time; ground needs an up-to-date SCLK |
+
+<p class="small muted">From the LASP <em>Time</em> presentation (Bershenyi/Moffatt, 2026).</p>
+
+::: notes
+Ask the room which category their mission is in. For GPS-disciplined missions the "SCLK kernel" may be trivial (MMS VTC = TAI), but the concept still applies.
+:::
+
+## Why it matters
+
+:::: {.columns}
+::: {.column width="50%"}
+<p class="big-number">7.5 m</p>
+along-track error per **1 ms** of timing error in LEO (7.5 km/s)
+:::
+::: {.column width="50%"}
+<p class="big-number">~700 m</p>
+MAVEN near periapsis (~4 km/s) if one day of drift (0.17 s) were ignored
+:::
+::::
+
+- Pointing error scales with slew rate the same way.
+- CK attitude is indexed by SCLK: a stale SCLK mis-times *and* mis-points.
+
+## In SpiceyPy (notebook 02)
+
+```python
+sp.furnsh(["naif0012.tls", "MVN_SCLKSCET.00133.tsc"])
+
+et  = sp.scs2e(-202, "3/0812345678.32768")   # clock string -> ET
+utc = sp.et2utc(et, "ISOC", 3)
+clk = sp.sce2s(-202, et)                     # ET -> clock string
+
+coeffs = sp.gdpool("SCLK01_COEFFICIENTS_202", 0, 1000).reshape(-1, 3)
+```
+
+::: {.small .muted}
+Spacecraft ID −202 selects MAVEN's clock (clock ID 202). Always load the newest SCLK for reprocessing.
+:::
+
+## Before next session
+
+**Homework:** notebook `02_time_and_sclk` — time conversions, leap seconds, and plotting MAVEN's real drift history from the SCLK kernel.
+
+**Reading for Session 3:** tutorial 15 (SPK); Aberration Corrections Required Reading (intro).
+
+**Discussion now**
+
+- Why won't SPICE let you add 86 400 to an SCLK and call it "one day later"?
+- MAVEN never slews its clock; a smallsat resets from the ground. What changes for your software?
+- What breaks in your code if leap seconds stop after 2035?

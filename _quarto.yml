@@ -1,0 +1,20 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+    - slides/*.qmd
+
+website:
+  title: "SPICE Book Club"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - text: Slides
+        menu:
+          - href: slides/02_time.qmd
+            text: "Session 2: Time"
+
+execute:
+  freeze: auto

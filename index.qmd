@@ -1,0 +1,16 @@
+---
+title: "SPICE Book Club"
+---
+
+A seven-session, biweekly reading group on the NAIF SPICE toolkit for LASP developers,
+using MAVEN as the running example.
+
+| # | Theme | Slides |
+|---|-------|--------|
+| 1 | SPICE architecture and kernels | *coming soon* |
+| 2 | Time | [Session 2: Time](slides/02_time.qmd) |
+| 3 | Ephemerides (SPK) | *coming soon* |
+| 4 | Rotations and reference frames | *coming soon* |
+| 5 | Attitude and instruments (CK, FK, IK) | *coming soon* |
+| 6 | Derived geometry and event finding | *coming soon* |
+| 7 | Making kernels (advanced, optional) | *coming soon* |
