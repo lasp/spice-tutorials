@@ -1,0 +1,298 @@
+---
+title: "Course Plan"
+subtitle: "SPICE Book Club"
+toc: true
+---
+
+Seven sessions take developers from "what is a kernel" to computing instrument geometry with kernels produced by other teams, plus an advanced final session on building their own SCLK, SPK and CK files. All work is in Python with SpiceyPy. Each session pairs NAIF self-training readings with a background primer on the physics or math NAIF assumes you already know, and a runnable notebook.
+
+## Overview
+
+- **Audience:** LASP developers comfortable in Python; little or no prior SPICE internals knowledge.
+- **Format:** book club. Participants read before each session; the session itself is ~60 minutes: 10 min Q&A on the previous notebook, 20 min background talk, 25 min discussion of the reading, 5 min preview. Notebooks are homework, done in the week after each session alongside the next reading.
+- **Cadence:** every two weeks; seven sessions total (six core, one advanced and optional).
+- **The gap this fills:** NAIF's tutorials explain *how* to use SPICE but rarely *why* the data look the way they do. Each session adds a primer on that missing context: how spacecraft keep time, why light-time matters, the linear algebra behind frames, and how attitude is measured on board.
+- **Running example:** MAVEN, a LASP-operated mission with public kernels (SCLK, SPK, CK, FK, IK) on the NAIF server. Using one real spacecraft throughout ties the abstractions to data people recognize.
+- **Existing LASP material reused:** an internal 2026 LASP *Time* presentation (Bershenyi/Moffatt) covering time history, UTC vs. TAI, spacecraft clock drift and the piecewise-linear SCLK model. It anchors Session 2.
+
+## Course at a glance
+
+| # | Theme | NAIF tutorials to read | Background primer (new content) | Notebook |
+|---|---|---|---|---|
+| 1 | SPICE architecture and kernels | 03, 04, 05, 06, 08, 12, 13, 14 | The observation-geometry problem; why ancillary data live in files | `01_kernels_and_ids` |
+| 2 | Time | 15, 16; Time Required Reading; SCLK Required Reading | Atomic vs. solar time, relativity and TDB, how spacecraft clocks tick, drift and get correlated | `02_time_and_sclk` |
+| 3 | Ephemerides | 18; Aberration Corrections Required Reading | State vectors, orbits as interpolated data, light-time and stellar aberration | `03_spk_ephemeris` |
+| 4 | Rotations and reference frames | 17, 21; written rotation primer | Rotation matrices, quaternions and their conventions, frame trees | `04_rotations_and_frames` |
+| 5 | Attitude and instruments | 20, 22, 25, 26 | How attitude is measured on board; rigid-body transforms; structure and instrument frames | `05_ck_fk_ik` |
+| 6 | Derived geometry and event finding | 27, 29, 30, 32, 33, 37 | Surface geometry, illumination, search over time windows | `06_geometry_finder` |
+| 7 (advanced, optional) | Making kernels | 42, 43; 30 (mkspk, msopck); SCLK Required Reading (coefficients) | Kernel production pipelines, type choices, validation and provenance | `07_making_kernels` |
+
+Tutorial numbers follow NAIF's current [SPICE Tutorials](https://naif.jpl.nasa.gov/naif/tutorials.html) page (last updated April 2023). Older self-training packages number them differently, so match by title if yours don't line up. Optional extras: 36 (WebGeocalc) in Session 1 as a no-code sandbox, 24 (dynamic frames) in Session 4, and 31 and 34 (non-toolkit apps, NAIF server) as reference.
+
+## Session 1: SPICE architecture and kernels
+
+Goal: everyone leaves with a working environment, a meta-kernel, and a mental model of SPICE as "a database of geometry, queried by time."
+
+**Reading:** tutorials 03 (overview), 04 (observation geometry concepts), 05 (conventions), 06 (NAIF IDs), 08 (intro to the toolkit), 12 (kernels), 13 (comments), 14 (API headers). Skim 01, 07 and 11 for setup only; 36 (WebGeocalc) optional.
+
+**Background primer: what problem is SPICE solving?**
+
+- Every science measurement needs ancillary answers: where was the spacecraft, where was it pointing, what time was it, what was in the field of view, was the target lit. These come from different teams (navigation, attitude, instrument, timing) at different cadences.
+- SPICE's design answer: each kind of ancillary data lives in its own kernel type, produced by whoever owns it, and the toolkit combines them at query time. That is why one question can need 6–10 files.
+- Developer framing: kernels are a read-only, file-backed key-value store keyed by (object ID, frame, time). The kernel pool is global state, which explains why load order, `furnsh`/`kclear`, and thread safety matter.
+- Text vs. binary kernels, and why both exist (human-editable constants vs. large, fast-to-search arrays).
+
+**Discussion prompts**
+
+- Which kernel types does your current project touch, even indirectly (e.g. through `time_convert`)?
+- Why does SPICE use integer NAIF IDs rather than names internally? What breaks if two kernels disagree on a name–ID mapping?
+- What are the risks of SPICE's global kernel pool in a long-running service or a multi-threaded pipeline?
+
+**Notebook `01_kernels_and_ids`**
+
+1. Install check: `spiceypy.tkvrsn('TOOLKIT')`.
+2. Download generic kernels (LSK, `de440s.bsp`, `pck00011.tpc`) with a small cached helper.
+3. Write a meta-kernel by hand, load it, and list what is loaded with `ktotal` / `kdata`.
+4. Name–ID lookups: `bodn2c`, `bodc2n`; spacecraft vs. body vs. instrument ID ranges.
+5. First geometry query: Earth–Moon distance over a month, plotted.
+6. Read kernel comments programmatically; inspect a binary SPK with `spkobj` / `spkcov`.
+7. Exercise: load the MAVEN FK and find every instrument ID it defines.
+
+## Session 2: Time
+
+Goal: participants can explain why an SCLK kernel exists before they ever open one, and can read a real SCLK kernel as a history of the spacecraft's clock.
+
+**Reading:** tutorials 15 (time) and 16 (LSK and SCLK); SPICE Time Subsystem and SCLK Required Reading (sections on clock strings, partitions and coefficients). Slides: [Session 2: Time](slides/02_time.qmd).
+
+**Background primer: how time works, on the ground and on a spacecraft**
+
+1. **Two ways to count time.** Solar time (UT1) follows Earth's irregular rotation; atomic time (TAI) counts uniform SI seconds. UTC is TAI with leap seconds inserted to stay within 0.9 s of UT1; TAI − UTC = 37 s since 2017.
+2. **Time for dynamics.** Equations of motion need a uniform time. TT = TAI + 32.184 s; TDB differs from TT by a periodic relativistic term of about 1.7 ms. SPICE's ET is TDB seconds past J2000 (2000-01-01 12:00:00 TDB). Why UTC is a *format*, not a computational time scale, in SPICE.
+3. **How a spacecraft keeps time.** A crystal oscillator drives a counter; the counter is split into fields (e.g. seconds + 1/65536 subticks) stamped into every telemetry packet. Oscillators drift with temperature and age, so a "second" on board is not an SI second.
+4. **Correlation.** The ground records when a packet arrives; subtract one-way light time and station delays to get when it left, and pair that with the on-board count. Many such pairs give a drift history.
+5. **The model.** Fit piecewise-linear segments (SCLK value, parallel time, rate). A clock reset starts a new *partition*. This is exactly the SCLK kernel's coefficient table.
+6. **The three operational strategies:** GPS-disciplined clock (MMS), adjust the on-board clock (SORCE), or leave the clock alone and model it on the ground (MAVEN, EMM, Kepler).
+7. **Why it matters:** at 7.5 km/s in LEO, a 1 ms timing error is 7.5 m of along-track error; for pointing, it scales with slew rate.
+
+**Discussion prompts**
+
+- Why does SPICE refuse to let you add 86400 to an SCLK and call it "one day later"?
+- What changes for MAVEN, whose clock is never slewed, versus a smallsat whose time is reset from the ground?
+- What would happen to your software if leap seconds were abolished (CGPM 2022 decision, by 2035)?
+
+**Notebook `02_time_and_sclk`**
+
+1. `str2et`, `et2utc`, `timout` picture strings; `deltet` to show ET − UTC.
+2. Plot TAI − UTC from the LSK across 1972–today; show a time across a leap second (23:59:60).
+3. Load the MAVEN SCLK; convert clock strings with `scs2e` / `sce2s`; decode the fields and moduli from the kernel.
+4. **Read the drift history:** pull MAVEN's coefficient table with `gdpool` (`SCLK01_COEFFICIENTS_202`), plot the clock rate per segment across the mission, and mark partition boundaries.
+5. Convert the same packet time with two SCLK versions to see why reprocessing needs the latest SCLK.
+6. Exercise: how large is the position error for MAVEN at periapsis if the SCLK is off by 20 ms?
+
+## Session 3: Ephemerides (SPK)
+
+Goal: participants understand an SPK as interpolated trajectory data with a center-of-motion chain, can check what a delivered SPK actually covers, and know when aberration corrections matter.
+
+**Reading:** tutorial 18 (SPK); Aberration Corrections Required Reading (intro and examples only). 42 (making an SPK) moves to Session 7.
+
+**Background primer: positions as data**
+
+- **State vectors.** Position + velocity relative to a center, in a frame, at a time. Every SPK query has all four parts; most bugs come from getting one implicitly wrong.
+- **Where trajectories come from.** Navigation teams fit orbits to radiometric tracking (range, Doppler, delta-DOR) and propagate forward; planetary ephemerides (DE440) are fits to decades of observations.
+- **Storing a trajectory.** Segments of Chebyshev polynomials (planets), Hermite or Lagrange interpolation of discrete states (spacecraft), or two-line elements (Earth orbiters). Accuracy vs. file size trade-offs.
+- **The center chain.** MAVEN relative to Mars barycenter, relative to the solar-system barycenter. SPICE walks the tree and adds vectors; a missing link is the classic "insufficient ephemeris data" error.
+- **Segment priority.** Later-loaded segments win, which is how predicts and reconstructions coexist.
+- **Light-time and stellar aberration.** Light from Mars is 3–22 minutes old. `LT+S` gives the apparent direction an instrument sees; `NONE` gives the geometric truth. Show the size: tens of arcseconds for stellar aberration, thousands of km of light-time displacement for planets.
+
+**Discussion prompts**
+
+- When should a science pipeline use `NONE` vs. `LT+S`? Who decides for your mission?
+- How would you detect that a predict SPK is still loaded over a reconstruction?
+
+**Notebook `03_spk_ephemeris`**
+
+1. `spkezr` / `spkpos` for planets; plot inner-solar-system orbits.
+2. Inspect coverage and segments of a MAVEN SPK (`spkcov`, `brief`-style summary).
+3. Plot MAVEN's orbit around Mars over a day; find periapsis altitude.
+4. Compare `NONE`, `LT`, `LT+S` for Mars from Earth and quantify the differences.
+5. **Audit a delivery:** find coverage gaps in a set of MAVEN SPKs and tell predicts from reconstructions using their comments.
+6. Exercise: load a predict and a reconstruction in both orders and show how segment priority changes the answer.
+
+## Session 4: Rotations and reference frames
+
+Goal: participants can move fluently between rotation matrices, Euler angles, axis-angle and quaternions, and know which convention SPICE uses for each.
+
+**Reading:** tutorials 17 (frames and coordinate systems) and 21 (FK); the written rotation primer. Optional: 19 (PCK), Rotation and Frames Required Reading, 24 (dynamic frames).
+
+**Background primer: the math of orientation**
+
+*In the 20-minute talk (four ideas):*
+
+1. **Frames as bases.** A frame is an origin plus three orthonormal axes. A rotation matrix is orthogonal: its inverse is its transpose, det R = +1.
+2. **Passive vs. active.** SPICE's `pxform` re-expresses a fixed vector in a new frame (passive); many libraries rotate the vector (active). Same matrix, opposite sign of angle: the most common source of bugs.
+3. **Composition and the frame tree.** R(A→C) = R(B→C) · R(A→B); SPICE chains inertial, body-fixed, spacecraft and instrument frames this way.
+4. **Quaternions and their conventions.** Four numbers, no singularities, cheap to compose; why telemetry and CKs use them. SPICE is scalar-first Hamilton; most attitude telemetry is scalar-last with the opposite rotation sense.
+
+*In the written primer (read before the session, not presented):* Euler angles and gimbal lock; axis-angle and Rodrigues' formula; SLERP and the q/−q double cover; SPICE's own active vs. passive routines (`rotate`/`rotvec` vs. `axisar`/`vrotv`); rotating states and the ω × r term behind `sxform`.
+
+**Discussion prompts**
+
+- Find a quaternion in your own telemetry. Is it scalar-first or scalar-last? Active or passive? How do you know?
+- Why does IAU_MARS need a PCK but J2000 does not?
+
+**Notebook `04_rotations_and_frames`**
+
+1. Interactive 3D widget: drag Euler angles, watch the axes, matrix and quaternion update together.
+2. Round-trip conversions (`eul2m`/`m2eul`, `m2q`/`q2m`) and a numeric check of orthogonality.
+3. Convert an engineering quaternion to SPICE form and verify against a known pointing.
+4. `pxform('J2000', 'IAU_MARS', et)`: inspect the frame chain behind it.
+5. Exercise: compute a ground station's position in J2000 from its latitude and longitude.
+
+Moved out: gimbal lock and SLERP demos become optional extras; writing a TK frame moves to Session 7.
+
+## Session 5: Attitude and instruments (CK, FK, IK)
+
+Goal: participants can trace a pixel on an instrument back through the instrument, spacecraft and inertial frames, and can diagnose why a pointing query fails or looks wrong.
+
+**Reading:** tutorials 20 (CK), 22 (using frames), 25 (IK), 26 (reading FKs and IKs). Revisit 21 (FK) for CK-based and fixed-offset frames. 43 (making a CK) moves to Session 7.
+
+**Background primer: how a spacecraft knows where it points**
+
+- **Sensors.** Star trackers give absolute attitude (arcseconds) at a few Hz; gyros give rates at high cadence but drift; sun sensors and magnetometers give coarse vectors. On-board estimators (usually a Kalman filter) fuse them and output a quaternion in telemetry.
+- **Control.** Reaction wheels and thrusters execute slews; the commanded profile (predict CK) differs from what happened (reconstructed CK).
+- **Rigid-body transforms.** A pose is rotation plus translation; robotics packs it into a 4×4 homogeneous matrix. SPICE splits it: translations live in SPKs (or are ignored for instrument offsets), rotations in CKs and FKs. Discuss when the instrument's physical offset from the spacecraft center matters (rarely for remote sensing, sometimes for close flybys or in-situ instruments).
+- **The structure chain.** Inertial → spacecraft bus (CK) → articulating platform (CK) → instrument mount (fixed FK) → detector (IK geometry). Alignment calibrations update the fixed links.
+- **Time again.** CK time tags are SCLK ticks, so Session 2 comes back: a wrong SCLK kernel silently mis-points every observation.
+- **CK practicalities.** Discrete vs. continuous types, interpolation intervals, gaps, and the tolerance argument in `ckgp`.
+
+**Discussion prompts**
+
+- Where in your mission's data flow does a telemetry quaternion become a CK? Who validates it?
+- How would you tell whether a pointing error comes from the CK, the FK alignment, or the SCLK?
+
+**Notebook `05_ck_fk_ik`**
+
+1. Load MAVEN CK, FK, IK and SCLK; get spacecraft attitude with `pxform` and coverage with `ckcov`.
+2. Read an IK with `getfov`; draw the instrument boresight and field of view on a Mars globe.
+3. Follow the frame chain explicitly with `frinfo` and `pxform` at each link.
+4. **Diagnose pointing:** find CK coverage gaps, see how the `ckgp` tolerance and interpolation intervals change results, and decode "no pointing available" errors.
+5. Introduce a deliberate 50 ms SCLK error and measure the resulting pointing error.
+6. Exercise: list which MAVEN frames are fixed offsets vs. CK-based, and which kernel supplies each link.
+
+## Session 6: Derived geometry and event finding
+
+Goal: participants combine every kernel type to answer real observation-planning questions, and know how to debug when SPICE says no.
+
+**Reading:** tutorials 27 (derived quantities), 29 (Geometry Finder), 30 (toolkit apps), 32 (exceptions), 33 (common problems), 37 (DSK). Skim 35 (summary of key points).
+
+**Background primer: from vectors to answers**
+
+- **Shape models.** Triaxial ellipsoids (PCK radii) vs. plate models (DSK); where each is good enough.
+- **Surface geometry.** Sub-observer and sub-solar points, ray–surface intercepts, and the incidence, emission and phase angles every remote-sensing scientist asks for.
+- **Searching over time.** GF treats geometry as a function of time and finds when a condition holds: root-finding with a step size you must choose. Too large a step misses short events.
+- **Errors as information.** SPICE's error subsystem, `SpiceyError` in Python, and reading a traceback to find the missing kernel.
+- **Toolkit utilities as debugging tools:** `brief`, `ckbrief`, `chronos`, `spacit`, `spkdiff`.
+
+**Discussion prompts**
+
+- What questions does your team currently answer with ad-hoc code that GF could answer directly?
+- What makes a GF step size safe for MAVEN's ~4.5-hour orbit?
+
+**Notebook `06_geometry_finder`**
+
+1. Sub-spacecraft ground track of MAVEN over Mars with `subpnt`; color by local solar time.
+2. Illumination angles at the boresight intercept with `sincpt` and `ilumin`.
+3. Find periapsis passes (`gfdist`) and Mars occultations as seen from a DSN station (`gfoclt`).
+4. Swap the ellipsoid for a DSK and compare intercept altitudes.
+5. Trigger and decode three common errors (missing LSK, no SPK coverage, wrong frame name).
+
+**Capstone (optional take-home):** each pair picks a question from their own work, writes a small notebook answering it, and presents it in 5 minutes at a follow-up session.
+
+## Session 7 (advanced, optional): Making kernels
+
+Goal: participants who produce or validate kernels understand how SCLK, SPK, CK and FK files are built, and can review a delivered kernel critically. Pure kernel users can skip it.
+
+**Reading:** tutorials 42 (making an SPK) and 43 (making a CK); the mkspk and msopck parts of 30; SCLK Required Reading (coefficients and partitions); revisit 13 (comments).
+
+**Background primer: where kernels come from**
+
+- **Production pipelines.** Tracking data → navigation solution → SPK; attitude telemetry → CK; time correlation → SCLK; alignment calibration → FK. Who owns each step for LASP missions vs. JPL navigation or the spacecraft vendor.
+- **Design choices.** SPK and CK types, interpolation degree, segment boundaries, and file size vs. accuracy.
+- **Quaternion conventions when writing CKs**, revisiting Session 4.
+- **Validation and provenance.** Comments as metadata, version and naming conventions, and checks such as `spkdiff`, `frmdiff` and `ckbrief` before a kernel enters a pipeline.
+
+**Discussion prompt:** what checks would you require before accepting a delivered kernel into your data system?
+
+**Notebook `07_making_kernels`**
+
+1. **SCLK:** simulate an oscillator with thermal drift and noisy correlation points, fit piecewise-linear segments within 50 ms, write a text SCLK, and compare `scs2e` against truth; add a clock reset to create a new partition.
+2. **SPK:** propagate a Keplerian orbit and write it with `spkw09`; write an Earth orbiter from a TLE with `spkw10`; compare with an mkspk setup file.
+3. **CK:** convert simulated engineering-style quaternion telemetry to SPICE quaternions, write with `ckw03`, and verify the boresight sweep.
+4. **FK:** define a fixed-offset instrument frame and check where it points.
+5. Add provenance comments and run validation checks on each file.
+
+## Notebooks and hosting
+
+Notebooks live in this repo, with an "Open in Colab" badge as the primary launch path and a Binder badge as the no-account alternative. Notebooks download only public NAIF kernels at runtime.
+
+| Option | Account needed | Strengths | Limits | Role |
+|---|---|---|---|---|
+| Google Colab | Google | Fast, reliable, persists to Drive | `pip install spiceypy` cell each session; widgets slightly different | Primary |
+| mybinder.org | None | Exact environment from `requirements.txt`; zero setup | Best-effort community service; launches can stall at peak; sessions are ephemeral | Backup |
+| JupyterLite (GitHub Pages) | None | Runs entirely in the browser, no server | SpiceyPy's Pyodide build (8.1.2+, June 2026) is marked highly experimental and 32-bit | Try for Sessions 1 and 4 only |
+| Local install | None | Full speed; can use mission kernel stores | Setup friction for some participants | For capstone work |
+
+**Repo layout**
+
+```
+spice-tutorials/
+  _quarto.yml          # one Quarto site: slides + primers + notebooks
+  index.qmd            # landing page: schedule, reading list, launch badges
+  course-plan.qmd      # this plan
+  requirements.txt     # spiceypy, numpy, matplotlib, plotly, ipywidgets, jupyter
+  spiceclub/kernels.py # download + cache kernels by URL, verify size
+  kernels/*.tm         # meta-kernels per session
+  slides/01_kernels.qmd ... 07_making_kernels.qmd   # reveal.js decks
+  primers/             # background primers (.qmd)
+  notebooks/01_kernels_and_ids.ipynb ... 07_making_kernels.ipynb
+  .github/workflows/   # render + publish to GitHub Pages; weekly notebook run
+```
+
+**Slides:** one short Quarto deck per session (10–15 slides for the 20-minute primer talk), rendered to reveal.js HTML. Sources are Markdown, so diffs and reviews stay readable; math, Mermaid diagrams, speaker notes and live SpiceyPy plots are built in. A GitHub Action renders the whole site to GitHub Pages, so participants get one link for slides, primers and Colab badges.
+
+**Design rules for the notebooks**
+
+- Each notebook starts with a setup cell that works in Colab, Binder and local (detects environment, installs if needed, fetches kernels).
+- Keep downloads small: `de440s.bsp` (~32 MB) plus a one- or two-day slice of MAVEN SPK/CK files.
+- Every notebook has "predict, then run" cells and a few exercises with hidden solutions.
+- A weekly GitHub Actions run executes all notebooks so a moved NAIF file is caught before a session.
+
+## Logistics
+
+**Facilitator prep per session:** run the notebook end to end before releasing it as homework; collect common stumbling points for the 10-minute Q&A; prepare the 20-minute primer talk; pick two discussion prompts. Solutions for each notebook's exercises go out with the next session's notebook. Consider rotating a participant as "discussion lead" from Session 3 on.
+
+**Decisions**
+
+- **Cadence:** biweekly; seven sessions run about 14 weeks.
+- **Running example:** MAVEN. MMS (GPS-disciplined time) remains a useful contrast in Session 2.
+- **Repo:** [lasp/spice-tutorials](https://github.com/lasp/spice-tutorials), published to GitHub Pages.
+
+**Next steps**
+
+- [x] Confirm cadence, running mission and repo location
+- [x] Create the spice-tutorials repo in the LASP GitHub organization
+- [ ] Write background primers for Sessions 2, 4 and 5 (time, rotation math, attitude)
+- [ ] Add `kernels.py` helper with MAVEN meta-kernels; test Colab and Binder launches
+- [ ] Draft notebooks 01–02 first and dry-run them with one volunteer
+- [ ] Draft notebooks 03–06, then 07 (advanced)
+- [ ] Write a Quarto slide deck per session (Session 2 done)
+- [ ] GitHub Actions workflow to publish the site to GitHub Pages
+
+## Sources
+
+- [NAIF SPICE Tutorials](https://naif.jpl.nasa.gov/naif/tutorials.html) (page last updated April 2023)
+- *Time* presentation, LASP, 2026 (internal)
+- NAIF Required Reading: Time, SCLK, SPK, Aberration Corrections, Rotation, Frames, CK; `m2q_c` and `axisar_c` headers
+- [MAVEN kernels on the NAIF server](https://naif.jpl.nasa.gov/pub/naif/MAVEN/kernels/)
+- [SpiceyPy Pyodide documentation](https://spiceypy.readthedocs.io/en/stable/pyodide.html)
+- [2i2c Binder federation impact report, Oct 2025](https://2i2c.org/blog/binder-report/)

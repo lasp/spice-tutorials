@@ -383,7 +383,7 @@ Spacecraft ID −202 selects MAVEN's clock (clock ID 202). Always load the newes
 
 **Homework:** notebook `02_time_and_sclk` — time conversions, leap seconds, and plotting MAVEN's real drift history from the SCLK kernel.
 
-**Reading for Session 3:** tutorial 15 (SPK); Aberration Corrections Required Reading (intro).
+**Reading for Session 3:** tutorial 18 (SPK); Aberration Corrections Required Reading (intro).
 
 **Discussion now**
 

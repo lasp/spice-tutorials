@@ -8,6 +8,7 @@ Developed at LASP for the SPICE Book Club, a seven-session biweekly reading grou
 
 | Path | What |
 |---|---|
+| `course-plan.qmd` | Session-by-session syllabus, hosting and logistics |
 | `slides/` | One Quarto (reveal.js) deck per session |
 | `primers/` | Background reading the NAIF tutorials skip *(coming)* |
 | `notebooks/` | Homework notebooks, runnable in Colab or Binder *(coming)* |

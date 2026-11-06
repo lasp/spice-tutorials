@@ -3,7 +3,8 @@ title: "SPICE Book Club"
 ---
 
 A seven-session, biweekly reading group on the NAIF SPICE toolkit for LASP developers,
-using MAVEN as the running example.
+using MAVEN as the running example. See the [Course Plan](course-plan.qmd) for readings,
+background topics and notebooks for each session.
 
 | # | Theme | Slides |
 |---|-------|--------|
