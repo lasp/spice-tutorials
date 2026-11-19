@@ -16,6 +16,8 @@ website:
         text: Course Plan
       - text: Slides
         menu:
+          - href: slides/01_kernels.qmd
+            text: "Session 1: Architecture and kernels"
           - href: slides/02_time.qmd
             text: "Session 2: Time"
 

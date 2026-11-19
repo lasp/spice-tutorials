@@ -1,0 +1,6 @@
+# Environment for Binder and local runs. Colab installs only spiceclub (which pulls in spiceypy).
+spiceypy>=6
+numpy
+matplotlib
+jupyter
+-e .

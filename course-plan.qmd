@@ -19,21 +19,23 @@ Seven sessions take developers from "what is a kernel" to computing instrument g
 
 | # | Theme | NAIF tutorials to read | Background primer (new content) | Notebook |
 |---|---|---|---|---|
-| 1 | SPICE architecture and kernels | 03, 04, 05, 06, 08, 12, 13, 14 | The observation-geometry problem; why ancillary data live in files | `01_kernels_and_ids` |
-| 2 | Time | 15, 16; Time Required Reading; SCLK Required Reading | Atomic vs. solar time, relativity and TDB, how spacecraft clocks tick, drift and get correlated | `02_time_and_sclk` |
-| 3 | Ephemerides | 18; Aberration Corrections Required Reading | State vectors, orbits as interpolated data, light-time and stellar aberration | `03_spk_ephemeris` |
-| 4 | Rotations and reference frames | 17, 21; written rotation primer | Rotation matrices, quaternions and their conventions, frame trees | `04_rotations_and_frames` |
-| 5 | Attitude and instruments | 20, 22, 25, 26 | How attitude is measured on board; rigid-body transforms; structure and instrument frames | `05_ck_fk_ik` |
-| 6 | Derived geometry and event finding | 27, 29, 30, 32, 33, 37 | Surface geometry, illumination, search over time windows | `06_geometry_finder` |
+| 1 | SPICE architecture and kernels | 03, 05 (slides 4, 7–9), 06, 08, 12, 13, 14 | The observation-geometry problem; why ancillary data live in files | `01_kernels_and_ids` |
+| 2 | Time | 04 (slides 4–13), 15, 16; Time Required Reading; SCLK Required Reading | Atomic vs. solar time, relativity and TDB, how spacecraft clocks tick, drift and get correlated | `02_time_and_sclk` |
+| 3 | Ephemerides | 04 (slides 25, 28–40), 18; Aberration Corrections Required Reading | State vectors, orbits as interpolated data, light-time and stellar aberration | `03_spk_ephemeris` |
+| 4 | Rotations and reference frames | 04 (slides 14–21, 26–27), 05 (slides 12–13), 17, 21; written rotation primer | Rotation matrices, quaternions and their conventions, frame trees | `04_rotations_and_frames` |
+| 5 | Attitude and instruments | 05 (slide 15), 20, 22, 25, 26; revisit 04 (slides 15–16) | How attitude is measured on board; rigid-body transforms; structure and instrument frames | `05_ck_fk_ik` |
+| 6 | Derived geometry and event finding | 04 (slides 22–24), 27, 29, 30, 32, 33, 37 | Surface geometry, illumination, search over time windows | `06_geometry_finder` |
 | 7 (advanced, optional) | Making kernels | 42, 43; 30 (mkspk, msopck); SCLK Required Reading (coefficients) | Kernel production pipelines, type choices, validation and provenance | `07_making_kernels` |
 
-Tutorial numbers follow NAIF's current [SPICE Tutorials](https://naif.jpl.nasa.gov/naif/tutorials.html) page (last updated April 2023). Older self-training packages number them differently, so match by title if yours don't line up. Optional extras: 36 (WebGeocalc) in Session 1 as a no-code sandbox, 24 (dynamic frames) in Session 4, and 31 and 34 (non-toolkit apps, NAIF server) as reference.
+Tutorial numbers follow NAIF's current [SPICE Tutorials](https://naif.jpl.nasa.gov/naif/tutorials.html) page (last updated April 2023). Older self-training packages number them differently, so match by title if yours don't line up.
+
+Tutorial 04 (*Fundamental Concepts*) touches nearly every later topic, so instead of reading it in Session 1 it is split by slide range across Sessions 2–6, just before the tutorials that build on each part. Tutorial 05 (*Conventions*) is treated the same way: Session 1 reads only the kernel-related slides, and the frame, quaternion and text-kernel slides move to Sessions 4 and 5. Its remaining slides (Fortran/C library naming, document extensions) matter little to Python users. Slide numbers are the same in the April 2023 version (40 slides) and the January 2020 version (38 slides; it lacks the last two aberration-effect slides). Optional extras: 36 (WebGeocalc) in Session 1 as a no-code sandbox, 24 (dynamic frames) in Session 4, and 31 and 34 (non-toolkit apps, NAIF server) as reference.
 
 ## Session 1: SPICE architecture and kernels
 
 Goal: everyone leaves with a working environment, a meta-kernel, and a mental model of SPICE as "a database of geometry, queried by time."
 
-**Reading:** tutorials 03 (overview), 04 (observation geometry concepts), 05 (conventions), 06 (NAIF IDs), 08 (intro to the toolkit), 12 (kernels), 13 (comments), 14 (API headers). Skim 01, 07 and 11 for setup only; 36 (WebGeocalc) optional.
+**Reading:** tutorials 03 (overview), 05 slides 4 and 7–9 (text vs. binary kernels, common synonyms, kernel file names and extensions; keep slide 7 handy as a glossary), 06 (NAIF IDs), 08 (intro to the toolkit), 12 (kernels), 13 (comments), 14 (API headers). Skim 01, 07 and 11 for setup only; 36 (WebGeocalc) optional. Slides: [Session 1: Architecture and kernels](slides/01_kernels.qmd).
 
 **Background primer: what problem is SPICE solving?**
 
@@ -62,7 +64,7 @@ Goal: everyone leaves with a working environment, a meta-kernel, and a mental mo
 
 Goal: participants can explain why an SCLK kernel exists before they ever open one, and can read a real SCLK kernel as a history of the spacecraft's clock.
 
-**Reading:** tutorials 15 (time) and 16 (LSK and SCLK); SPICE Time Subsystem and SCLK Required Reading (sections on clock strings, partitions and coefficients). Slides: [Session 2: Time](slides/02_time.qmd).
+**Reading:** tutorial 04 slides 4–13 (time concepts: TAI, UTC, UT1, leap seconds, TDB, TDT, spacecraft clocks), then 15 (time) and 16 (LSK and SCLK); SPICE Time Subsystem and SCLK Required Reading (sections on clock strings, partitions and coefficients). Slides: [Session 2: Time](slides/02_time.qmd).
 
 **Background primer: how time works, on the ground and on a spacecraft**
 
@@ -93,7 +95,7 @@ Goal: participants can explain why an SCLK kernel exists before they ever open o
 
 Goal: participants understand an SPK as interpolated trajectory data with a center-of-motion chain, can check what a delivered SPK actually covers, and know when aberration corrections matter.
 
-**Reading:** tutorial 18 (SPK); Aberration Corrections Required Reading (intro and examples only). 42 (making an SPK) moves to Session 7.
+**Reading:** tutorial 04 slides 25 (state vectors) and 28–40 (aberration corrections; skim the effect tables on 37–40), then 18 (SPK); Aberration Corrections Required Reading (intro and examples only). 42 (making an SPK) moves to Session 7.
 
 **Background primer: positions as data**
 
@@ -122,7 +124,7 @@ Goal: participants understand an SPK as interpolated trajectory data with a cent
 
 Goal: participants can move fluently between rotation matrices, Euler angles, axis-angle and quaternions, and know which convention SPICE uses for each.
 
-**Reading:** tutorials 17 (frames and coordinate systems) and 21 (FK); the written rotation primer. Optional: 19 (PCK), Rotation and Frames Required Reading, 24 (dynamic frames).
+**Reading:** tutorial 04 slides 14–21 (reference frames: centers, types, J2000/ICRF, body-fixed, topocentric) and 26–27 (transforming states); tutorial 05 slides 12–13 (right-handed frames, quaternion styles); then 17 (frames and coordinate systems) and 21 (FK); the written rotation primer. Optional: 19 (PCK), Rotation and Frames Required Reading, 24 (dynamic frames), NAIF's [quaternion white paper](https://naif.jpl.nasa.gov/pub/naif/misc/Quaternion_White_Paper/Quaternions_White_Paper.pdf).
 
 **Background primer: the math of orientation**
 
@@ -154,7 +156,7 @@ Moved out: gimbal lock and SLERP demos become optional extras; writing a TK fram
 
 Goal: participants can trace a pixel on an instrument back through the instrument, spacecraft and inertial frames, and can diagnose why a pointing query fails or looks wrong.
 
-**Reading:** tutorials 20 (CK), 22 (using frames), 25 (IK), 26 (reading FKs and IKs). Revisit 21 (FK) for CK-based and fixed-offset frames. 43 (making a CK) moves to Session 7.
+**Reading:** tutorials 20 (CK), 22 (using frames), 25 (IK), 26 (reading FKs and IKs). Revisit 21 (FK) for CK-based and fixed-offset frames, and tutorial 04 slides 15–16 (frame centers and frame types). Tutorial 05 slide 15 covers quoting strings in text kernels, which you'll see in every FK and IK. 43 (making a CK) moves to Session 7.
 
 **Background primer: how a spacecraft knows where it points**
 
@@ -183,7 +185,7 @@ Goal: participants can trace a pixel on an instrument back through the instrumen
 
 Goal: participants combine every kernel type to answer real observation-planning questions, and know how to debug when SPICE says no.
 
-**Reading:** tutorials 27 (derived quantities), 29 (Geometry Finder), 30 (toolkit apps), 32 (exceptions), 33 (common problems), 37 (DSK). Skim 35 (summary of key points).
+**Reading:** tutorial 04 slides 22–24 (planetocentric, planetodetic and planetographic coordinates), then 27 (derived quantities), 29 (Geometry Finder), 30 (toolkit apps), 32 (exceptions), 33 (common problems), 37 (DSK). Skim 35 (summary of key points).
 
 **Background primer: from vectors to answers**
 
@@ -282,10 +284,12 @@ spice-tutorials/
 - [x] Confirm cadence, running mission and repo location
 - [x] Create the spice-tutorials repo in the LASP GitHub organization
 - [ ] Write background primers for Sessions 2, 4 and 5 (time, rotation math, attitude)
-- [ ] Add `kernels.py` helper with MAVEN meta-kernels; test Colab and Binder launches
-- [ ] Draft notebooks 01–02 first and dry-run them with one volunteer
+- [x] Add `kernels.py` helper and Session 1 meta-kernel
+- [ ] Test Colab and Binder launches against the real NAIF server
+- [x] Draft notebook 01
+- [ ] Draft notebook 02; dry-run 01–02 with one volunteer
 - [ ] Draft notebooks 03–06, then 07 (advanced)
-- [ ] Write a Quarto slide deck per session (Session 2 done)
+- [ ] Write a Quarto slide deck per session (Sessions 1 and 2 done)
 - [ ] GitHub Actions workflow to publish the site to GitHub Pages
 
 ## Sources
