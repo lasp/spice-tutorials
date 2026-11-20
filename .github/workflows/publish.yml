@@ -1,0 +1,45 @@
+# Publish the Quarto site (course plan + slides) to GitHub Pages.
+#
+# CI does NOT execute Python. Code cells come from the committed _freeze/
+# folder, so after editing a deck's code, re-render locally and commit
+# _freeze/ along with the .qmd:
+#
+#     quarto render            # from the repo root, with kernels fetched
+#     git add _freeze slides
+#
+# If a deck's code changed but _freeze/ wasn't updated, Quarto will try to
+# run it here and the job will fail (no Python/kernels) -- that's the cue
+# to re-render locally.
+#
+# One-time setup:
+#   1. Locally: `quarto publish gh-pages` (creates the gh-pages branch).
+#   2. Repo Settings -> Pages -> Source: "Deploy from a branch",
+#      branch gh-pages, folder / (root).
+
+name: Publish site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # push to the gh-pages branch
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      - uses: quarto-dev/quarto-actions/publish@v2
+        with:
+          target: gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

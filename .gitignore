@@ -1,6 +1,8 @@
 # Quarto build output
 /_site/
 /.quarto/
+# NOTE: do NOT ignore /_freeze/ -- it holds the executed outputs of the
+# slides, so the Pages workflow can publish without Python or NAIF kernels.
 slides/*.html
 slides/*_files/
 *_files/
