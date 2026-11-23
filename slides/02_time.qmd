@@ -2,17 +2,7 @@
 title: "Session 2: Time"
 subtitle: "Why a spacecraft needs an SCLK kernel"
 author: "SPICE Book Club · LASP"
-format:
-  revealjs:
-    theme: [default, custom.scss]
-    slide-number: true
-    preview-links: auto
-    embed-resources: true
-    footer: "SPICE Book Club · Session 2: Time"
-jupyter: python3
-execute:
-  echo: false
-  warning: false
+footer: "SPICE Book Club · Session 2: Time"
 ---
 
 ```{python}

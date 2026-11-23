@@ -1,0 +1,16 @@
+# Shared settings for every deck in slides/. A deck's own YAML only needs
+# title, subtitle, author and footer; anything set there overrides this.
+format:
+  revealjs:
+    theme: [default, custom.scss]     # LASP theme, see custom.scss
+    width: 1280                       # 16:9, matches the LASP template art
+    height: 720
+    margin: 0.06
+    slide-number: c
+    preview-links: auto
+    embed-resources: true
+    include-after-body: lasp-deck.html
+jupyter: python3
+execute:
+  echo: false
+  warning: false

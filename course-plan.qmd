@@ -29,13 +29,13 @@ Seven sessions take developers from "what is a kernel" to computing instrument g
 
 Tutorial numbers follow NAIF's current [SPICE Tutorials](https://naif.jpl.nasa.gov/naif/tutorials.html) page (last updated April 2023). Older self-training packages number them differently, so match by title if yours don't line up.
 
-Tutorial 04 (*Fundamental Concepts*) touches nearly every later topic, so instead of reading it in Session 1 it is split by slide range across Sessions 2–6, just before the tutorials that build on each part. Tutorial 05 (*Conventions*) is treated the same way: Session 1 reads only the kernel-related slides, and the frame, quaternion and text-kernel slides move to Sessions 4 and 5. Its remaining slides (Fortran/C library naming, document extensions) matter little to Python users. Slide numbers are the same in the April 2023 version (40 slides) and the January 2020 version (38 slides; it lacks the last two aberration-effect slides). Optional extras: 36 (WebGeocalc) in Session 1 as a no-code sandbox, 24 (dynamic frames) in Session 4, and 31 and 34 (non-toolkit apps, NAIF server) as reference.
+Tutorial 04 (*Fundamental Concepts*) touches nearly every later topic, so instead of reading it in Session 1 it is split by slide range across Sessions 2–6, just before the tutorials that build on each part. Tutorial 05 (*Conventions*) is treated the same way: Session 1 reads only the kernel-related slides, and the frame, quaternion and text-kernel slides move to Sessions 4 and 5. Its remaining slides (Fortran/C library naming, document extensions) matter little to Python users. Slide numbers are the same in the April 2023 version (40 slides) and the January 2020 version (38 slides; it lacks the last two aberration-effect slides). Optional extras: 24 (dynamic frames) in Session 4, and 31 and 34 (non-toolkit apps, NAIF server) as reference.
 
 ## Session 1: SPICE architecture and kernels
 
 Goal: everyone leaves with a working environment, a meta-kernel, and a mental model of SPICE as "a database of geometry, queried by time."
 
-**Reading:** tutorials 03 (overview), 05 slides 4 and 7–9 (text vs. binary kernels, common synonyms, kernel file names and extensions; keep slide 7 handy as a glossary), 06 (NAIF IDs), 08 (intro to the toolkit), 12 (kernels), 13 (comments), 14 (API headers). Skim 01, 07 and 11 for setup only; 36 (WebGeocalc) optional. Slides: [Session 1: Architecture and kernels](slides/01_kernels.qmd).
+**Reading:** tutorials 03 (overview), 05 slides 4 and 7–9 (text vs. binary kernels, common synonyms, kernel file names and extensions; keep slide 7 handy as a glossary), 06 (NAIF IDs), 08 (intro to the toolkit), 12 (kernels), 13 (comments), 14 (API headers). Skim 01, 07 and 11 for setup only. Slides: [Session 1: Architecture and kernels](slides/01_kernels.qmd).
 
 **Background primer: what problem is SPICE solving?**
 
@@ -105,6 +105,10 @@ Goal: participants understand an SPK as interpolated trajectory data with a cent
 - **The center chain.** MAVEN relative to Mars barycenter, relative to the solar-system barycenter. SPICE walks the tree and adds vectors; a missing link is the classic "insufficient ephemeris data" error.
 - **Segment priority.** Later-loaded segments win, which is how predicts and reconstructions coexist.
 - **Light-time and stellar aberration.** Light from Mars is 3–22 minutes old. `LT+S` gives the apparent direction an instrument sees; `NONE` gives the geometric truth. Show the size: tens of arcseconds for stellar aberration, thousands of km of light-time displacement for planets.
+
+::: {.callout-warning title="To do: move the NAIF ID slide here"}
+The "Names are a layer over integers" slide (live `bodn2c` table of NAIF IDs) is being cut from the Session 1 deck and belongs in the Session 3 deck. Reframe it around where users actually meet the integers: `spkcov`/`brief` coverage output, "insufficient ephemeris data" errors, and the Mars barycenter (4) vs. Mars (499) trap. Instrument IDs (`MAVEN_IUVS` = −202518, `INS-202518_*` IK keywords) get a brief mention in Session 5.
+:::
 
 **Discussion prompts**
 

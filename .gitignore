@@ -4,6 +4,8 @@
 # NOTE: do NOT ignore /_freeze/ -- it holds the executed outputs of the
 # slides, so the Pages workflow can publish without Python or NAIF kernels.
 slides/*.html
+# ...but keep the theme include, which is source, not build output
+!slides/lasp-deck.html
 slides/*_files/
 *_files/
 

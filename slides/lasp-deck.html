@@ -1,0 +1,38 @@
+<!-- LASP theme glue, included in every deck by _metadata.yml.
+     The image rules are here rather than in custom.scss so that "assets/..."
+     resolves against the deck's own folder (and gets embedded by
+     embed-resources). -->
+<style>
+  .reveal .slide-background-content {
+    background-image: url("assets/lasp-bg-content-light.jpg");
+  }
+  .reveal .backgrounds > .slide-background:first-child .slide-background-content,
+  .reveal .backgrounds .slide-background.lasp-section-bg .slide-background-content {
+    background-image: url("assets/lasp-bg-title-light.jpg");
+  }
+  .reveal #title-slide::before {
+    background-image: url("assets/lasp-wordmark-black.png");
+  }
+  .reveal .footer::before {
+    background-image: url("assets/lasp-wordmark-white-sm.png");
+  }
+  .reveal:has(section.title-slide.level1.present) .footer::before {
+    background-image: url("assets/lasp-wordmark-black-sm.png");
+  }
+</style>
+<script>
+// Give section slides (level-1 "# Heading") the title-slide background art.
+// Reveal paints backgrounds in a separate layer, so CSS alone cannot tell
+// which background belongs to a section slide.
+(function () {
+  function mark() {
+    Reveal.getSlides().forEach(function (s) {
+      if (s.matches("section.title-slide.level1")) {
+        var bg = Reveal.getSlideBackground(s);
+        if (bg) bg.classList.add("lasp-section-bg");
+      }
+    });
+  }
+  if (Reveal.isReady()) mark(); else Reveal.on("ready", mark);
+})();
+</script>

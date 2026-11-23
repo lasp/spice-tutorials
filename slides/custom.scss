@@ -1,13 +1,299 @@
+/* LASP theme for the SPICE Book Club decks.
+ *
+ * Ported from lasp-revealjs-slide-template/assets/lasp-theme.css (light
+ * theme only). Brand, fonts, backgrounds, wordmark and footer bar match the
+ * template. The geometry does not: Quarto keeps reveal's fixed canvas
+ * (1280x720, set in _metadata.yml), so overview mode and ?print-pdf keep
+ * working.
+ *
+ * LASP brand: CU Gold #CFB87C, Black, Dark Gray #565A5C, White.
+ * CU prohibits White + CU Gold for readable text, so gold is used only for
+ * non-text accents (the progress bar, selection, rules).
+ * https://lasp.colorado.edu/information/logos/
+ * https://www.colorado.edu/digital-accessibility/color-combinations
+ *
+ * Images live in slides/assets/ (resized copies of the template's images).
+ * Every rule that names an image is in lasp-deck.html, not here: Quarto
+ * resolves url() in a theme against its own site_libs/ copy of the compiled
+ * CSS, while a <style> in the page resolves against the deck itself.
+ */
+
 /*-- scss:defaults --*/
-$presentation-font-size-root: 34px;
-$link-color: #1f5fa8;
-$presentation-heading-color: #14324f;
+$cu-gold: #cfb87c;
+$lasp-dark-gray: #565a5c;
+$lasp-navy: #28384d;      // .pptx accent1; title color
+$pale-blue: #daedef;      // .pptx accent5; callouts
+$lasp-link: #426aa3;      // .pptx hyperlink color
+
+$font-family-sans-serif: "Helvetica Neue", Arial, Helvetica, Carlito, sans-serif;
+$font-family-monospace: "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+$presentation-font-size-root: 32px;
+$presentation-line-height: 1.3;
+$body-bg: #ffffff;
+$body-color: #000000;
+$link-color: $lasp-link;
+$presentation-heading-font: $font-family-sans-serif;
+$presentation-heading-color: $lasp-navy;
+$presentation-heading-font-weight: 700;
+$presentation-heading-text-transform: none;
+$presentation-heading-letter-spacing: normal;
+$presentation-h2-font-size: 1.11em;
+$presentation-h3-font-size: 1em;
+$code-block-bg: #f5f5f5;
+$code-block-border-color: #c8c8c8;
+$selection-bg: $cu-gold;
+$selection-color: #000000;
 
 /*-- scss:rules --*/
-.reveal .slide-subtitle { color: #4a5a6a; }
+$bar-h: 38px;
+
+/* ---- Backgrounds -------------------------------------------------------
+ * Reveal paints each slide's background in a separate layer, one
+ * .slide-background per slide, in slide order. Content slides get the pale
+ * content art; the title slide and section (level-1 "# Part") slides get the
+ * title art. */
+.reveal .slide-background-content {
+  background-size: cover;
+  background-position: center;
+}
+
+/* ---- Content slides ----------------------------------------------------- */
+.reveal .slides {
+  text-align: left;
+}
+.reveal .slides section {
+  // leave room for the footer bar
+  padding-bottom: $bar-h;
+}
+.reveal h2 {
+  margin-bottom: 0.6em;
+  line-height: 1.15;
+}
+.reveal h3 {
+  color: $body-color;
+  margin-bottom: 0.3em;
+}
+.reveal li::marker {
+  color: $lasp-navy;
+}
+.reveal li {
+  margin-bottom: 0.3em;
+}
+.reveal .slides a {
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}
+.reveal .slides pre a,
+.reveal .slides .sourceCode a {
+  border-bottom: none;
+}
+.reveal table {
+  font-size: 0.62em;
+}
+.reveal table th {
+  color: $lasp-navy;
+}
+
+/* Plots: the 16:9 canvas is wider than Quarto's default, so a full-width
+ * figure would push its caption under the footer bar. Cap the height. */
+.reveal .cell-output-display img {
+  max-height: 480px;
+  width: auto;
+  margin: 0 auto;
+  display: block;
+}
+
+/* Mermaid diagrams size themselves from their content, ignoring
+ * fig-height, so a wide flowchart can push the text below it under the
+ * footer bar. Cap the height the same way as plots. */
+.reveal .cell-output-display svg.mermaid-js {
+  max-height: 400px;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  display: block;
+}
+
+/* Code: an inset light panel, as in the template. */
+.reveal pre {
+  box-shadow: none;
+}
+.reveal pre code {
+  font-size: 0.95em;
+  line-height: 1.3;
+  max-height: none;
+  border: 1px solid $code-block-border-color;
+  border-radius: 4px;
+}
+.reveal div.sourceCode {
+  border: none;
+  background: transparent;
+}
+
+/* ---- Helper classes used in the decks ------------------------------------ */
+.reveal .slide-subtitle { color: $lasp-dark-gray; }
 .reveal .small { font-size: 0.7em; }
-.reveal .muted { color: #6b7785; }
-.reveal .callout { border-left: 6px solid #1f5fa8; background: #eef4fb; padding: 0.4em 0.8em; margin-top: 0.6em; }
-.reveal table { font-size: 0.62em; }
-.reveal pre code { font-size: 0.95em; line-height: 1.3; max-height: none; }
-.reveal .big-number { font-size: 2.4em; font-weight: 700; color: #1f5fa8; line-height: 1.1; }
+.reveal .muted { color: $lasp-dark-gray; }
+/* `::: {.callout}` becomes a Quarto callout, whose own styles need !important
+ * to override. */
+.reveal div.callout {
+  border: none !important;
+  border-left: 6px solid $lasp-navy !important;
+  border-radius: 0 !important;
+  background: $pale-blue !important;
+  padding: 0.4em 0.8em !important;
+  margin-top: 0.6em;
+  box-shadow: none !important;
+}
+.reveal .big-number {
+  font-size: 2.4em;
+  font-weight: 700;
+  color: $lasp-navy;
+  line-height: 1.1;
+}
+/* The one-line "so what" under the evidence: `::: {.takeaway}` */
+.reveal .takeaway {
+  margin-top: 0.8em;
+  padding-top: 0.5em;
+  border-top: 1px solid rgba(0, 0, 0, 0.18);
+  font-size: 0.85em;
+  font-style: italic;
+  color: $lasp-navy;
+}
+/* One number or one claim: `## {.bang}` with a single paragraph. */
+.reveal .slides section.bang {
+  text-align: center;
+}
+.reveal .slides section.bang > p {
+  font-size: 2.2em;
+  font-weight: 700;
+  line-height: 1.1;
+  color: $lasp-navy;
+  margin-top: 25%;
+}
+
+/* ---- Title slide (Quarto's #title-slide) --------------------------------- */
+.reveal #title-slide {
+  text-align: left;
+  // Earth/Sun art sits on the right; keep the text in the left ~60%.
+  padding-right: 38%;
+  padding-top: 150px;
+  box-sizing: border-box;
+}
+.reveal #title-slide::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 320px;
+  aspect-ratio: 4558 / 1043;
+  background: no-repeat left top / contain;
+}
+.reveal #title-slide .title {
+  font-size: 2em;
+  color: #000000;
+  margin-bottom: 0.35em;
+}
+.reveal #title-slide .subtitle {
+  font-size: 1em;
+  color: #000000;
+  font-weight: 400;
+}
+.reveal #title-slide .quarto-title-authors {
+  justify-content: flex-start;
+  margin-top: 1.5em;
+}
+.reveal #title-slide .quarto-title-author {
+  padding-left: 0;
+}
+.reveal #title-slide .quarto-title-author-name,
+.reveal #title-slide .date,
+.reveal #title-slide .quarto-title-affiliation {
+  // CU Dark Gray (6.7:1), not gold (2.1:1) on the pale background
+  color: $lasp-dark-gray;
+  font-size: 0.9em;
+}
+
+/* ---- Section slides (level-1 headings: `# Part one`) ---------------------- */
+.reveal .slides section.title-slide.level1 h1 {
+  color: #000000;
+  font-size: 2em;
+  max-width: 62%;
+}
+
+/* ---- Footer bar ---------------------------------------------------------- *
+ * Quarto's `footer:` option renders one .footer element; it is restyled
+ * into the template's bar: 70% navy, white wordmark, white text, slide number
+ * at the right. */
+.reveal .footer {
+  position: absolute;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: $bar-h;
+  margin: 0 !important;
+  padding: 0 4.5em 0 0.6em;
+  display: flex !important;
+  align-items: center;
+  gap: 0.8em;
+  box-sizing: border-box;
+  background: rgba(40, 56, 77, 0.7);
+  color: #ffffff;
+  font-size: 18px !important;
+  text-align: left !important;
+  z-index: 20;
+}
+.reveal .footer::before {
+  content: "";
+  flex: 0 0 auto;
+  height: 70%;
+  aspect-ratio: 200 / 47;
+  background: no-repeat left center / contain;
+}
+.reveal .footer p {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.reveal .slide-number {
+  position: absolute;
+  right: 1.2em !important;
+  bottom: 0 !important;
+  height: $bar-h;
+  line-height: $bar-h;
+  padding: 0 !important;
+  background: transparent !important;
+  color: #ffffff !important;
+  font-size: 18px !important;
+  font-variant-numeric: tabular-nums;
+  z-index: 30;
+}
+.reveal .slide-number a { border-bottom: none; color: inherit; }
+
+/* No bar on the title slide; a bare bar (black wordmark, no fill, no number)
+ * on section slides. */
+.reveal:has(#title-slide.present) .footer,
+.reveal:has(#title-slide.present) .slide-number {
+  display: none !important;
+}
+.reveal:has(section.title-slide.level1.present) .footer {
+  background: none;
+  color: #000000;
+}
+.reveal:has(section.title-slide.level1.present) .slide-number {
+  visibility: hidden;
+}
+
+/* ---- Reveal chrome ------------------------------------------------------- */
+.reveal .controls {
+  bottom: calc(#{$bar-h} + 12px);
+  color: $lasp-navy;
+}
+.reveal .progress {
+  top: 0;
+  bottom: auto;
+  height: 3px;
+  color: $cu-gold;
+}

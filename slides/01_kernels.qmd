@@ -2,17 +2,7 @@
 title: "Session 1: Architecture and kernels"
 subtitle: "What problem is SPICE solving?"
 author: "SPICE Book Club · LASP"
-format:
-  revealjs:
-    theme: [default, custom.scss]
-    slide-number: true
-    preview-links: auto
-    embed-resources: true
-    footer: "SPICE Book Club · Session 1: Architecture and kernels"
-jupyter: python3
-execute:
-  echo: false
-  warning: false
+footer: "SPICE Book Club · Session 1: Architecture and kernels"
 ---
 
 ```{python}
@@ -24,21 +14,21 @@ sp.kclear()
 sp.furnsh("../kernels/naif0012.tls")   # leapseconds kernel (LSK)
 ```
 
-## One row of science data {.smaller}
+## One science observation {.smaller}
 
-An IUVS spectrum from MAVEN, time-tagged by the spacecraft clock.
+A single spectrum from MAVEN's ultraviolet spectrograph (IUVS), time-tagged by the spacecraft clock.
 
 To turn it into science, someone has to answer:
 
 :::: {.columns}
 ::: {.column width="50%"}
-- **When** was it taken, in UTC?
+- **When** was it taken, in a standard time system (UTC, TAI, TDB, ...)?
 - **Where** was MAVEN?
 - **Which way** was it pointing?
 :::
 ::: {.column width="50%"}
 - **What** did the slit see: limb, disk, sky?
-- **What** was the solar zenith angle there?
+- **What** was the viewing geometry? Solar zenith, emission, phase, and ray nadir angles; local time
 - **How far** was the light from the target?
 :::
 ::::
@@ -46,7 +36,7 @@ To turn it into science, someone has to answer:
 . . .
 
 ::: {.callout}
-None of these answers is in the science packet. They are **ancillary data**, and each one comes from a different team.
+None of these are answered by the instrument telemetry. They can be answered using **ancillary data products**, each of which comes from a different team.
 :::
 
 ::: notes
@@ -58,12 +48,12 @@ Start from a measurement everyone in the data systems group has handled. The poi
 | Question | Who knows | Cadence | SPICE kernel |
 |---|---|---|---|
 | UTC ↔ uniform time | IERS (leap seconds) | rarely | **LSK** |
-| Clock count ↔ time | mission ops, time correlation | weeks | **SCLK** |
-| Where is the spacecraft? | navigation (JPL NAV for MAVEN) | days | **SPK** |
+| Clock count ↔ time | mission ops, time correlation | days/weeks | **SCLK** |
+| Where is the s/c? | navigation (JPL NAV for MAVEN) | days | **SPK** |
 | Where are the planets? | JPL Solar System Dynamics | years | **SPK** |
-| Which way is it pointing? | attitude telemetry (spacecraft ops) | daily | **CK** |
+| Which way is the s/c oriented? | attitude telemetry (spacecraft ops) | daily | **CK** |
 | How are instruments mounted? | spacecraft builder, instrument team | rarely | **FK**, **IK** |
-| Shape and spin of the target | IAU, science teams | rarely | **PCK**, **DSK** |
+| Shape and orientation of the target | IAU, science teams | rarely | **PCK**, **DSK** |
 
 ::: {.small .muted}
 Different owners, different update rates, different sizes, different formats. SPICE's whole design follows from this table.
@@ -77,7 +67,7 @@ Ask the room who on the team has touched each of these, even indirectly. Most wi
 
 ```{mermaid}
 %%| fig-width: 9
-%%| fig-height: 4
+%%| fig-height: 3
 flowchart LR
   NAV[Navigation] --> SPK[(SPK)]
   OPS[Spacecraft ops] --> CK[(CK)]
@@ -85,17 +75,17 @@ flowchart LR
   INST[Instrument team] --> IK[(FK / IK)]
   IERS[IERS / IAU] --> LSK[(LSK / PCK)]
   SPK & CK & SCLK & IK & LSK --> POOL{{"kernel pool<br/>(in your process)"}}
-  POOL --> API["spkpos, sincpt,<br/>scs2e, ..."]
+  POOL --> API["spice function"]
   API --> YOU[Your code]
 ```
 
 ::: {.small}
-Each kind of ancillary data lives in **its own file type**, produced and versioned by whoever owns it. The **toolkit** combines them only at query time.
+Each kind of ancillary data lives in **its own file type**, produced and versioned by whoever owns it. The **SPICE toolkit** combines them only at query time.
 :::
 
 ## Why one answer needs 6–10 files
 
-"Where did the IUVS boresight hit Mars at this clock tick, and was it lit?"
+"Where did the IUVS boresight hit Mars at this clock tick, and was it illuminated?"
 
 | Step | Kernel |
 |---|---|
@@ -111,9 +101,11 @@ Miss any one and the call fails, loudly. That is a feature: SPICE errors name th
 
 ## A developer's model
 
-::: {.callout}
-Kernels are a **read-only, file-backed store** keyed by *(object ID, reference frame, time)*. Each API call is a query against everything loaded.
-:::
+Think of SPICE the way you'd think of a database:
+
+- **Kernels are a read-only data store.** Loading files with `furnsh` is like attaching data sources.
+- **Each API call is a query.** `str2et` and `spkpos` ask a question; SPICE finds the answer in whatever is loaded.
+- **The caller never names a file.** The **kernel pool** decides which file answers.
 
 ```python
 import spiceypy as sp
@@ -124,8 +116,6 @@ et = sp.str2et("2026-11-19T12:00:00")               # query 1: time   (LSK)
 pos, lt = sp.spkpos("MOON", et, "J2000",            # query 2: state  (SPK)
                     "NONE", "EARTH")
 ```
-
-No file names appear in the queries. The **kernel pool** decides which file answers.
 
 ## The kernel pool is global state
 
@@ -142,7 +132,8 @@ No file names appear in the queries. The **kernel pool** decides which file answ
 
 - Load once, at startup, in one place.
 - CSPICE is **not thread-safe**: one SPICE caller per process, or a lock.
-- Log what you loaded (`ktotal` / `kdata`); it *is* your provenance.
+- Log what you loaded (`ktotal` / `kdata`). It's an upper bound on what was used, so load as little as you need.
+- Kernels must be on a **local (POSIX) file system**.
 :::
 ::::
 
@@ -164,46 +155,7 @@ This is the slide most relevant to the data systems group. Long-running services
 Text kernels can be read and diffed like code. Binary kernels can't: inspect them with toolkit utilities (`brief`, `ckbrief`, `commnt`) or API calls, never a text editor.
 :::
 
-## Inside a text kernel
-
-```{.text}
-KPL/LSK                                    ← file type ID on line 1
-
-Anything outside a data block is a comment.
-
-\begindata
-DELTET/DELTA_T_A = 32.184
-DELTET/DELTA_AT  = ( 10, @1972-JAN-1
-                     11, @1972-JUL-1
-                     ...
-                     37, @2017-JAN-1 )
-\begintext
-```
-
-```{python}
-n = len(sp.gdpool("DELTET/DELTA_AT", 0, 200)) // 2
-Markdown(f"Loaded right now from `naif0012.tls`: **{n} entries** in `DELTET/DELTA_AT`, read back with `gdpool`.")
-```
-
-## Names are a layer over integers
-
-```{python}
-rows = []
-for name in ["SOLAR SYSTEM BARYCENTER", "SUN", "EARTH BARYCENTER", "EARTH", "MOON",
-             "MARS BARYCENTER", "MARS", "PHOBOS", "MAVEN"]:
-    rows.append(f"| {name} | {sp.bodn2c(name)} |")
-Markdown("| Name | NAIF ID |\n|---|---|\n" + "\n".join(rows))
-```
-
-::: {.small}
-Patterns: barycenters 1–9 · Sun 10 · planets *P*99 · moons *P*01–98 · spacecraft negative · instruments −*SSS*xxx · ground stations 399xxx. Mission kernels add names (e.g. `MAVEN_IUVS`).
-:::
-
-::: notes
-The table is computed live with bodn2c: these mappings are built into the toolkit. Ask: why both 4 and 499 for Mars? Answer next session in SPK land: the planetary SPK gives barycenters; the planet-to-barycenter offset is a separate file.
-:::
-
-## Meta-kernels: the list *is* the provenance
+## Meta-kernels: convenient, but not provenance {.smaller}
 
 ```{.text}
 KPL/MK
@@ -217,47 +169,66 @@ KPL/MK
 ```
 
 - One `furnsh` loads them all, **in this order**: later files have priority.
-- Relative paths resolve against the **working directory**, not the `.tm` file.
-- Version the meta-kernel with your code; it records exactly which data you used.
+- **Fragile paths.** Relative paths resolve against the *working directory*, not the `.tm` file, so a meta-kernel that works on one machine often breaks on another.
+- **Loaded ≠ used.** A mission-wide meta-kernel loads everything for the whole mission. It records what was *available*, not the minimum set SPICE actually used for your answer.
 
-## Read before you trust
+::: {.callout}
+**Opinion: **
+Don't load a mission-wide meta-kernel blindly. For provenance, record the **minimum set of kernels covering your time range**. LASP projects such as **EMM** and **IMAP** keep a kernel database and utilities that return exactly that set.
+:::
+
+::: notes
+Presenter's opinion, stated as such: meta-kernels are handy for notebooks and quick scripts, but in production pipelines they are fragile and say little about provenance. EMM and IMAP have built kernel databases (possibly other LASP projects too); invite people from those teams to say how theirs work.
+:::
+
+## Kernels document themselves {.smaller}
 
 :::: {.columns}
-::: {.column width="50%"}
-**Comments**
+::: {.column width="55%"}
+Comment area of `de440s.bsp` (excerpt)
 
-Who made the file, from what, valid when, known problems.
+```{.text}
+JPL planetary and lunar ephemeris DE440
+Integrated 25 June 2020
+Reference: R.S. Park et al., Astronomical Journal,
+  DOI: 10.3847/1538-3881/abd414
+...
+Time span covered by ephemeris:
+26-DEC-1849 00:00 to   22-JAN-2150 00:00
 
-- text kernels: outside `\begindata`
-- binary kernels: comment area (`commnt`, `dafec`)
+Bodies included:
+  MERCURY BARYCENTER (1)  SATURN BARYCENTER (6)  MERCURY (199)
+  VENUS BARYCENTER (2)    URANUS BARYCENTER (7)  VENUS (299)
+  EARTH BARYCENTER (3)    NEPTUNE BARYCENTER (8) MOON (301)
+  MARS BARYCENTER (4)     PLUTO BARYCENTER (9)   EARTH (399)
+  JUPITER BARYCENTER (5)  SUN (10)
+```
 :::
-::: {.column width="50%"}
-**Coverage**
+::: {.column width="45%"}
+**Comments answer the questions you'd otherwise email someone about:** who made the file, from what data, the time span it covers, what's in it (and what isn't), and known problems.
 
-What the file actually contains.
+- Text kernels: open in an editor.
+- Binary kernels: `commnt -r file.bsp`.
 
-- `spkobj` / `spkcov` for SPK
-- `ckobj` / `ckcov` for CK
-- `brief`, `ckbrief` on the command line
+**Start with the `aareadme.txt`.** Many NAIF kernel directories have one, e.g. [`generic_kernels/`](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/){target="_blank" preview-link="false"}, [`generic_kernels/pck/`](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/){target="_blank" preview-link="false"} and [`MAVEN/kernels/`](https://naif.jpl.nasa.gov/pub/naif/MAVEN/kernels/){target="_blank" preview-link="false"}. It explains naming, versions, and which file to use.
 :::
 ::::
 
-::: {.callout}
-Most "SPICE is broken" reports are a kernel that doesn't cover the time asked for, or the wrong version loaded. Check both first.
+::: notes
+Point at the body list: Mars barycenter (4) is there, Mars itself (499) is not. The comments told you that before any code failed. That is the hook for the barycenter discussion in Session 3. In spk/planets the readme files are named aareadme_de430-de431.txt and aa_summaries.txt, so "aa*" is the pattern to look for.
 :::
 
 ## Reading guide for this session
 
 | NAIF tutorial | Read for |
 |---|---|
-| 03 Overview | the "why" behind today's slides |
-| 05 Conventions (slides 4, 7–9), 06 NAIF IDs | text vs. binary kernels, file extensions, synonyms; NAIF IDs |
-| 08 Intro to toolkit, 14 API headers | how to read a function's documentation |
-| 12 Kernels, 13 Comments | kernel types, meta-kernels, comment areas |
-| 36 WebGeocalc (optional) | a no-code sandbox for the same queries |
+| [03 Overview](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/03_spice_overview.pdf){target="_blank" preview-link="false"} | the "why" behind today's slides |
+| [05 Conventions](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/05_conventions.pdf){target="_blank" preview-link="false"} (slides 4, 7–9), [06 NAIF IDs](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/06_naif_ids.pdf){target="_blank" preview-link="false"} | text vs. binary kernels, file extensions, synonyms; NAIF IDs |
+| [08 Intro to toolkit](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/08_intro_to_toolkit.pdf){target="_blank" preview-link="false"}, [14 API headers](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/14_using_module_headers.pdf){target="_blank" preview-link="false"} | how to read a function's documentation |
+| [12 Kernels](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/12_intro_to_kernels.pdf){target="_blank" preview-link="false"}, [13 Comments](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/13_comments_in_kernels.pdf){target="_blank" preview-link="false"} | kernel types, meta-kernels, comment areas |
 
 ::: {.small .muted}
-Numbering follows NAIF's current tutorials page. 04 Concepts is read in pieces over Sessions 2–6. Skim 01, 07 and 11 for installation only; in Python, `pip install spiceypy` replaces them.
+Numbering follows NAIF's current [tutorials page](https://naif.jpl.nasa.gov/naif/tutorials.html){target="_blank" preview-link="false"}. Skim [01](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/01_welcome_to_tutorials.pdf){target="_blank" preview-link="false"}, [07](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/07_installing_toolkit.pdf){target="_blank" preview-link="false"} and [11](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/Tutorials/pdf/individual_docs/11_preparing_for_programming.pdf){target="_blank" preview-link="false"} for installation only; in Python, `pip install spiceypy` replaces them.
 :::
 
 ## Before next session
