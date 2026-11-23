@@ -46,7 +46,7 @@ ul.task-list li input[type="checkbox"] {
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-8a6c6d3613ab290d596ef53e5f3d5925.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-44f7b187718e43abfea0560aa82c1a71.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -256,12 +256,12 @@ ul.task-list li input[type="checkbox"] {
 </tbody>
 </table>
 <p>Tutorial numbers follow NAIF’s current <a href="https://naif.jpl.nasa.gov/naif/tutorials.html">SPICE Tutorials</a> page (last updated April 2023). Older self-training packages number them differently, so match by title if yours don’t line up.</p>
-<p>Tutorial 04 (<em>Fundamental Concepts</em>) touches nearly every later topic, so instead of reading it in Session 1 it is split by slide range across Sessions 2–6, just before the tutorials that build on each part. Tutorial 05 (<em>Conventions</em>) is treated the same way: Session 1 reads only the kernel-related slides, and the frame, quaternion and text-kernel slides move to Sessions 4 and 5. Its remaining slides (Fortran/C library naming, document extensions) matter little to Python users. Slide numbers are the same in the April 2023 version (40 slides) and the January 2020 version (38 slides; it lacks the last two aberration-effect slides). Optional extras: 36 (WebGeocalc) in Session 1 as a no-code sandbox, 24 (dynamic frames) in Session 4, and 31 and 34 (non-toolkit apps, NAIF server) as reference.</p>
+<p>Tutorial 04 (<em>Fundamental Concepts</em>) touches nearly every later topic, so instead of reading it in Session 1 it is split by slide range across Sessions 2–6, just before the tutorials that build on each part. Tutorial 05 (<em>Conventions</em>) is treated the same way: Session 1 reads only the kernel-related slides, and the frame, quaternion and text-kernel slides move to Sessions 4 and 5. Its remaining slides (Fortran/C library naming, document extensions) matter little to Python users. Slide numbers are the same in the April 2023 version (40 slides) and the January 2020 version (38 slides; it lacks the last two aberration-effect slides). Optional extras: 24 (dynamic frames) in Session 4, and 31 and 34 (non-toolkit apps, NAIF server) as reference.</p>
 </section>
 <section id="session-1-spice-architecture-and-kernels" class="level2">
 <h2 class="anchored" data-anchor-id="session-1-spice-architecture-and-kernels">Session 1: SPICE architecture and kernels</h2>
 <p>Goal: everyone leaves with a working environment, a meta-kernel, and a mental model of SPICE as “a database of geometry, queried by time.”</p>
-<p><strong>Reading:</strong> tutorials 03 (overview), 05 slides 4 and 7–9 (text vs.&nbsp;binary kernels, common synonyms, kernel file names and extensions; keep slide 7 handy as a glossary), 06 (NAIF IDs), 08 (intro to the toolkit), 12 (kernels), 13 (comments), 14 (API headers). Skim 01, 07 and 11 for setup only; 36 (WebGeocalc) optional. Slides: <a href="./slides/01_kernels.html">Session 1: Architecture and kernels</a>.</p>
+<p><strong>Reading:</strong> tutorials 03 (overview), 05 slides 4 and 7–9 (text vs.&nbsp;binary kernels, common synonyms, kernel file names and extensions; keep slide 7 handy as a glossary), 06 (NAIF IDs), 08 (intro to the toolkit), 12 (kernels), 13 (comments), 14 (API headers). Skim 01, 07 and 11 for setup only. Slides: <a href="./slides/01_kernels.html">Session 1: Architecture and kernels</a>.</p>
 <p><strong>Background primer: what problem is SPICE solving?</strong></p>
 <ul>
 <li>Every science measurement needs ancillary answers: where was the spacecraft, where was it pointing, what time was it, what was in the field of view, was the target lit. These come from different teams (navigation, attitude, instrument, timing) at different cadences.</li>
@@ -329,6 +329,19 @@ ul.task-list li input[type="checkbox"] {
 <li><strong>Segment priority.</strong> Later-loaded segments win, which is how predicts and reconstructions coexist.</li>
 <li><strong>Light-time and stellar aberration.</strong> Light from Mars is 3–22 minutes old. <code>LT+S</code> gives the apparent direction an instrument sees; <code>NONE</code> gives the geometric truth. Show the size: tens of arcseconds for stellar aberration, thousands of km of light-time displacement for planets.</li>
 </ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>To do: move the NAIF ID slide here
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The “Names are a layer over integers” slide (live <code>bodn2c</code> table of NAIF IDs) is being cut from the Session 1 deck and belongs in the Session 3 deck. Reframe it around where users actually meet the integers: <code>spkcov</code>/<code>brief</code> coverage output, “insufficient ephemeris data” errors, and the Mars barycenter (4) vs.&nbsp;Mars (499) trap. Instrument IDs (<code>MAVEN_IUVS</code> = −202518, <code>INS-202518_*</code> IK keywords) get a brief mention in Session 5.</p>
+</div>
+</div>
 <p><strong>Discussion prompts</strong></p>
 <ul>
 <li>When should a science pipeline use <code>NONE</code> vs.&nbsp;<code>LT+S</code>? Who decides for your mission?</li>
